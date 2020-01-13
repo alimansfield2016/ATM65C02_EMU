@@ -122,8 +122,8 @@ public:
 	// External event functions. In hardware these represent pins that are asserted
 	// to produce a change in state.
 	void reset();	// Reset Interrupt - Forces CPU into known state
-	void irq();		// Interrupt Request - Executes an instruction at a specific location
-	void nmi();		// Non-Maskable Interrupt Request - As above, but cannot be disabled
+	uint8_t irq();		// Interrupt Request - Executes an instruction at a specific location
+	uint8_t nmi();		// Non-Maskable Interrupt Request - As above, but cannot be disabled
 	void clock();	// Perform one clock cycle's worth of update
 
 	// Indicates the current instruction has completed by returning true. This is

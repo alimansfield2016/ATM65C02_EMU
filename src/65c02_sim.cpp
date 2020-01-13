@@ -59,26 +59,34 @@
 
 #include "include/Bus.h"
 #include "include/olc6502.h"
+#include "include/atmKeyboard.h"
 
 #define OLC_PGE_APPLICATION
 #include <personal/olcPixelGameEngine.h>
 
+#define CPU_FREQ 1000000.0		//1MHz
+#define KB_FREQ  1.0/0.000070 	//70us period
+#define KB_FREQ  10000.0	 	//70us period
+
+bool interrupt = false;
 
 
-class Demo_olc2C02 : public olc::PixelGameEngine
+class atm65c22_emu : public olc::PixelGameEngine
 {
 public:
-	Demo_olc2C02() { sAppName = "6502 emulator"; }
+	atm65c22_emu() { sAppName = "6502 emulator"; }
 
 private: 
 	// The NES
 	Bus nes;
+	atmKeyboard KB;
 	// std::vector<uint8_t> ROM;
 	bool bEmulationRun = false;
 	float fResidualTime = 0.0f;
 	float fTotalTime = 0.0f;
 	bool wait_for_return = false;
-
+	bool int_pause = false;
+	bool bKeyboardInput = false;
 private: 
 	// Support Utilities
 	std::map<uint16_t, std::string> mapAsm;
@@ -123,7 +131,7 @@ private:
 		DrawString(x , y + 20, "A: $" +  hex(nes.cpu.a, 2) + "  [" + std::to_string(nes.cpu.a) + "]");
 		DrawString(x , y + 30, "X: $" +  hex(nes.cpu.x, 2) + "  [" + std::to_string(nes.cpu.x) + "]");
 		DrawString(x , y + 40, "Y: $" +  hex(nes.cpu.y, 2) + "  [" + std::to_string(nes.cpu.y) + "]");
-		DrawString(x , y + 50, "Stack P: $" + hex(nes.cpu.stkp, 4));
+		DrawString(x , y + 50, "Stack P: $" + hex(nes.cpu.stkp+0x100, 4));
 		DrawString(x , y + 60, "CPU Cycles: " + std::to_string(nes.cpu.GetClockCount()));
 	}
 
@@ -169,6 +177,23 @@ private:
 
 	}
 
+	void DrawControls(int x, int y){
+		std::string text = "KB ";
+		DrawString(x, y, text, bKeyboardInput?olc::GREEN:olc::RED);
+		text = "<INS>|";
+		DrawString(x + 3*7, y, text);
+
+		text = bEmulationRun?" RUN  ":"PAUSE ";
+		DrawString(x + 10*7, y, text, bEmulationRun?olc::GREEN:olc::RED);
+		text = "<SPACE>| ";
+		DrawString(x + 16*7, y, text);
+
+		text = " BRK ";
+		DrawString(x + 25*7, y, text, int_pause?olc::GREEN:olc::RED);
+		text = "<I>| ";
+		DrawString(x+30*7, y, text);
+	}
+
 
 	bool OnUserCreate()
 	{
@@ -180,12 +205,22 @@ private:
 		// Insert into NES
 		// nes.insertCartridge(cart);
 
+
+
+
+
+		for(uint16_t i = 0; i < 65535; i++){
+			nes.cpuWrite(i, 0);
+			nes.lcd.unInit();
+			nes.via.write(0x000E, ~0x80);
+		}
 		if(nes.loadROM("65c02.rom") != 0){
 			return false;
 		}
 		// Extract dissassembly
 		mapAsm = nes.cpu.disassemble(0x0000, 0xFFFF);
-
+		KB.ConnectVIA(&nes.via);
+		nes.via.ConnectKeyboard(&KB);
 		// Reset NES
 		nes.reset();
 		return true;
@@ -195,64 +230,110 @@ private:
 	{
 		Clear(olc::DARK_BLUE);
 		fTotalTime += fElapsedTime;
-		static uint32_t key_hold = 0, kh_up = 0, kh_dn = 0;
+		static uint32_t key_hold = 0, kh_up = 0, kh_dn = 0, kh_l = 0, kh_r = 0;
 		static uint8_t page = 2;
-		if(bEmulationRun)
-			for(uint32_t cycles = fElapsedTime*1000000*3 /*cpu clocked for every 3 cycles*/; cycles > 0; cycles --){
-				nes.clock();
-				if(wait_for_return){
-					if(nes.cpu.returned()){
-						bEmulationRun = false;
-						wait_for_return = false;
-						cycles = 0;
-						break;
-					}
+		if(bEmulationRun){
+			for(float cycles = fElapsedTime*CPU_FREQ; cycles > 0 && !(interrupt && int_pause); cycles-= 1.0/1.8432000){
+				nes.acia.clock();
+
+				if(fmod(cycles, (CPU_FREQ/(KB_FREQ*2.0)) ) < 1.0/1.8432000 ){
+					//clock the KB twice (H/L) at 10khz
+					KB.clock();
 				}
 
+				if(fmod(cycles, 1.0) < 1.0/1.8432000 ){
+					nes.clock();
+					if(wait_for_return){
+						if(nes.cpu.returned()){
+							bEmulationRun = false;
+							wait_for_return = false;
+							cycles = 0;
+							break;
+						}
+					}
+				}
 			}
-			
-
-		// Emulate code step-by-step
-		if (GetKey(olc::Key::C).bPressed)
-		{
-			// Clock enough times to execute a whole CPU instruction
-			do { nes.clock(); } while (!nes.cpu.complete());
-			// CPU clock runs slower than system clock, so it may be
-			// complete for additional system clock cycles. Drain
-			// those out
-			do { nes.clock(); } while (nes.cpu.complete());
-		}else if(GetKey(olc::Key::C).bHeld){
-			key_hold++;
-			if(key_hold > 100){
-				do { nes.clock(); } while (!nes.cpu.complete());
-			}
-		}else{
-			key_hold = 0;
 		}
-		if(GetKey(olc::Key::E).bPressed){
-			nes.cpu.wait_return();
-			wait_for_return = true;
-			bEmulationRun = true;
+		if(GetKey(olc::Key::INS).bPressed){
+			bKeyboardInput = !bKeyboardInput;
+			KB.setState(bKeyboardInput);
 		}
 
-		if (GetKey(olc::Key::SPACE).bPressed) bEmulationRun = !bEmulationRun;
-		if (GetKey(olc::Key::R).bPressed) nes.reset();		
-		if(GetKey(olc::Key::CTRL).bHeld && GetKey(olc::Key::C).bPressed)
-			return false;
+		if(!bKeyboardInput){
+			// Emulate code step-by-step
+			if (GetKey(olc::Key::C).bPressed)
+			{
+				if(GetKey(olc::Key::LSHIFT).bHeld){
+					nes.clock();
+				}else{
+					// Clock enough times to execute a whole CPU instruction
+					do { nes.clock(); } while (!nes.cpu.complete() && !(interrupt && int_pause));
+					// CPU clock runs slower than system clock, so it may be
+					// complete for additional system clock cycles. Drain
+					// those out
+					do { nes.clock(); } while (nes.cpu.complete() && !(interrupt && int_pause));
+				}
+			}else if(GetKey(olc::Key::C).bHeld){
+				key_hold++;
+				if(key_hold > 30){
+				if(GetKey(olc::Key::LSHIFT).bHeld)
+					nes.clock();
+				else
+					do { nes.clock(); } while (!nes.cpu.complete() && !(interrupt && int_pause));
+				}
+			}else{
+				key_hold = 0;
+			}
+			if(GetKey(olc::Key::E).bPressed){
+				nes.cpu.wait_return();
+				wait_for_return = true;
+				bEmulationRun = true;
+			}
 
-		if(GetKey(olc::Key::UP).bPressed)
-			page++;
-		else if(GetKey(olc::Key::UP).bHeld)
-			kh_up++ > 30?page++:0;
-		else 
-			kh_up = 0;
-		if(GetKey(olc::Key::DOWN).bPressed)
-			page--;
-		else if(GetKey(olc::Key::DOWN).bHeld)
-			 kh_dn++ > 30?page--:0;
-		else
-			kh_dn = 0;
+			if (GetKey(olc::Key::SPACE).bPressed) bEmulationRun = !bEmulationRun;
+			if (GetKey(olc::Key::R).bPressed){
+				if(GetKey(olc::Key::LCTRL).bHeld){
+					//hard reset of emulator
+					OnUserCreate();
+				}else
+					nes.reset();		
 
+			} 
+			if(GetKey(olc::Key::LCTRL).bHeld && GetKey(olc::Key::C).bPressed)
+				return false;
+
+			if(GetKey(olc::Key::UP).bPressed)
+				page++;
+			else if(GetKey(olc::Key::UP).bHeld)
+				kh_up++ > 30?page++:0;
+			else 
+				kh_up = 0;
+			if(GetKey(olc::Key::DOWN).bPressed)
+				page--;
+			else if(GetKey(olc::Key::DOWN).bHeld)
+				kh_dn++ > 30?page--:0;
+			else
+				kh_dn = 0;
+			if(GetKey(olc::Key::RIGHT).bPressed)
+				page+=16;
+			else if(GetKey(olc::Key::RIGHT).bHeld)
+				kh_l++ > 30?page+=16:0;
+			else 
+				kh_l = 0;
+			if(GetKey(olc::Key::LEFT).bPressed)
+				page-=16;
+			else if(GetKey(olc::Key::LEFT).bHeld)
+				kh_r++ > 30?page-=16:0;
+			else
+				kh_r = 0;
+			if(GetKey(olc::Key::I).bPressed)
+				int_pause = !int_pause;
+		}
+
+		if(interrupt && int_pause){
+			bEmulationRun = false;
+			interrupt = false;
+		}
 		DrawCpu(495, 2);
 		DrawCode(495, 82, 20);
 		DrawRam(4, 75, 0x0000, 16, 16);
@@ -260,8 +341,9 @@ private:
 		DrawStack(495, 300, 0x20-nes.cpu.stkp);
 		nes.lcd.redraw(fTotalTime);
 		nes.via.redraw();
-		DrawSprite(447, 75, &nes.via.GetScreen(), 2);
+		DrawSprite(440, 75, &nes.via.GetScreen(), 1);
 		DrawSprite(1, 1, &nes.lcd.GetScreen(), 2);
+		DrawControls(15, 525);
 		return true;
 	}
 };
@@ -269,11 +351,11 @@ private:
 
 
 
-Demo_olc2C02 demo;
+atm65c22_emu demo;
 
 int main()
 {
-	demo.Construct(700, 400, 2, 2);
+	demo.Construct(960, 540, 2, 2);
 	demo.Start();
 	return 0;
 }

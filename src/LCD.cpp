@@ -1,7 +1,8 @@
 #include "include/LCD.h"
 #include "include/cgrom.h"
-// #include <stdio.h>
-
+#ifdef LCD_LOG
+#include <stdio.h>
+#endif
 LCD::LCD(){
 	for(int i = 1; i < n_w*6; i++){
 		for(int j = 1; j < n_h*9; j++){
@@ -17,17 +18,12 @@ uint8_t LCD::read(uint16_t addr, uint8_t &data){
 	
 }
 uint8_t LCD::write(uint16_t addr, uint8_t data){
-	// printf("LCD Written to $%4x:%2x, ", addr, data);
-	// fflush(stdout);
-	if(!(addr >= 0x6400 && addr < 0x6800))
-		return 0;
+	// if(!(addr >= 0x6400 && addr < 0x6800))
+	// 	return 0;
 	uint8_t rs = addr%2;
 	uint8_t disp_sel = (addr>>1)&0x3;
-	// printf("Display: %c%c, ", disp_sel&1?'1':'0', disp_sel&2?'1':'0');
-	// printf("%s, ", rs?"Data":"Instruction");
-	// rs?printf("%c", data):0;
 	for(int disp = 0; disp < n_disp; disp++){
-		if(disp_sel&(0x01<<disp)){
+		if(disp_sel&(1<<disp)){
 			if(rs){	// data
 				if(b_ddram_cgram[disp]){
 					//ddram
@@ -35,19 +31,24 @@ uint8_t LCD::write(uint16_t addr, uint8_t data){
 					//handle increment mode
 					if(b_addr_inc[disp]){
 						n_ddram_addr[disp]++;
+						if(b_display_shift[disp])
+							n_disp_shift[disp]++;
 					}else{
 						n_ddram_addr[disp]--;
+						if(b_display_shift[disp])
+							n_disp_shift[disp]--;
 					}
-					addr++;
-					if(n_ddram_addr[disp]&~0xC0 > n_w){
-						if(b_addr_inc[disp]){
-							//to next visible area
-							while((n_ddram_addr[disp]++)&~0xC0);
-						}else{
-							while(((n_ddram_addr[disp]--)&~0xC0)!= n_w-1);
-						}
-						// n_ddram_addr[disp] += 0x40-n_ddram_addr[disp]&0x40;
+					if(n_disp_shift[disp]>0x28)	
+						n_disp_shift[disp]-=0x28;
+					if(n_disp_shift[disp]<0)	
+						n_disp_shift[disp]+=0x28;
+					if((n_ddram_addr[disp]&~0xC0) >= 0x28 && b_addr_inc[disp]){
+						n_ddram_addr[disp] = (n_ddram_addr[disp]&0xC0) + 0x40;
 					}
+					if((n_ddram_addr[disp]&~0xC0) >= 0x28 && !b_addr_inc[disp]){
+						n_ddram_addr[disp] = (n_ddram_addr[disp]&0xC0)+0x27;
+					}
+					n_ddram_addr[disp] &= ~0x80;
 				}
 			}else{ // instruction
 				bool msb_found = 0;
@@ -67,6 +68,7 @@ uint8_t LCD::write(uint16_t addr, uint8_t data){
 				case ret_home:
 					n_ddram_addr[disp] = 0;
 					n_disp_shift[disp] = 0;
+					b_ddram_cgram[disp] = true;
 					break;
 
 				case entry_mode:
@@ -81,6 +83,34 @@ uint8_t LCD::write(uint16_t addr, uint8_t data){
 					break;
 
 				case cursor_shift:
+					if(data&(1<<3)){
+						//shift screen
+						if(data&(1<<2)){
+							//right
+							n_disp_shift[disp]++;
+							if(n_disp_shift[disp]>0x28)	
+								n_disp_shift[disp]-=0x28;
+						}else{
+							//left
+							n_disp_shift[disp]--;
+							if(n_disp_shift[disp]<0)	
+								n_disp_shift[disp]+=0x28;
+						}
+						
+					}else{
+						//shift cursor
+						if(data&(1<<2)){
+							n_ddram_addr[disp]++;
+							if((n_ddram_addr[disp]&~0xC0) >= 0x28){
+								n_ddram_addr[disp] = (n_ddram_addr[disp]&0xC0) + 0x40;
+							}
+						}else{
+							n_ddram_addr[disp]--;
+							if((n_ddram_addr[disp]&~0xC0) >= 0x28){
+								n_ddram_addr[disp] = (n_ddram_addr[disp]&0xC0)+0x27;
+							}
+						}
+					}
 
 					break;
 
@@ -90,10 +120,12 @@ uint8_t LCD::write(uint16_t addr, uint8_t data){
 
 				case set_cgram_addr:
 					n_cgram_addr[disp] = data&0x3F;
+					b_ddram_cgram[disp] = false;
 					break;
 
 				case set_ddram_addr:
 					n_ddram_addr[disp] = data&0x7F;
+					b_ddram_cgram[disp] = true;
 					break;
 				
 				default:
@@ -102,7 +134,14 @@ uint8_t LCD::write(uint16_t addr, uint8_t data){
 			}
 		}
 	}
-	// printf("\n");
+	#ifdef LCD_LOG
+	printf("LCD Written to $%4x:%2x, ", addr, data);
+	fflush(stdout);
+	printf("Display: %c%c, ", disp_sel&1?'1':'0', disp_sel&2?'1':'0');
+	printf("%s, ", rs?"Data":"Instruction");
+	rs?printf("%c", data):0;
+	printf("\n");
+	#endif
 }
 
 olc::Sprite& LCD::GetScreen(){
@@ -111,16 +150,18 @@ olc::Sprite& LCD::GetScreen(){
 
 void LCD::redraw(float f_time){
 	for(int i = 0; i < n_h; i++){
+		uint8_t disp = (i>>1);
 		for(int j = 0; j < n_w; j++){
 			for(int n = 0; n < 8; n++){
-				uint8_t chr = CGROM[n_ddram[i>>1][0x40*(i%2)+j]*0x10 + n];
+				uint8_t chr = CGROM[n_ddram[disp][0x40*(i%2)+ (j + n_disp_shift[disp])%0x28]*0x10 + n];
+
 				for(int k = 0; k < 5; k++){
-					if(n==7 && b_initialised[i>>1] && !b_cursor_blink[i>>1] &&  b_cursor_on[i>>1] && n_ddram_addr[i>>1] == i*0x40+j)
+					if(n==7 && b_initialised[disp] && !b_cursor_blink[disp] &&  b_cursor_on[disp] && n_ddram_addr[disp] == (i%2)*0x40+j)
 						lcd_display.SetPixel(j*6+4-k, i*9+n, FG);
 						#ifdef CURSOR_FULL_BLINK
-					else if((fmod(f_time,1.0) < 0.5) && b_initialised[i>>1] && b_cursor_blink[i>>1] &&b_cursor_on[i>>1] && n_ddram_addr[i>>1] == i*0x40+j)
+					else if((fmod(f_time,1.0) < 0.5) && b_initialised[disp] && b_cursor_blink[disp] &&b_cursor_on[disp] && n_ddram_addr[disp] == i*0x40+j)
 						#else
-					else if(n==7 && (fmod(f_time,1.0) < 0.5) && b_initialised[i>>1] && b_cursor_blink[i>>1] &&b_cursor_on[i>>1] && n_ddram_addr[i>>1] == i*0x40+j)
+					else if(n==7 && (fmod(f_time,1.0) < 0.5) && b_initialised[disp] && b_cursor_blink[disp] &&b_cursor_on[disp] && n_ddram_addr[disp] == (i%2)*0x40+j)
 						#endif	
 						lcd_display.SetPixel(j*6+4-k, i*9+n, FG);
 					else
@@ -129,5 +170,11 @@ void LCD::redraw(float f_time){
 				}
 			}
 		}
+	}
+}
+
+void LCD::unInit(){
+	for(auto &b : b_initialised){
+		b = false;
 	}
 }

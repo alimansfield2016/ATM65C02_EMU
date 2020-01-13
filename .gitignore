@@ -3,4 +3,5 @@ obj/*
 65c02.rom 
 myapp
 .vscode/*
+.VSCodeCounter/*
 nest

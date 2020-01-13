@@ -54,16 +54,18 @@
 	David Barr, aka javidx9, �OneLoneCoder 2019
 */
 
+ 
+#include "olc6502.h"
+#include "LCD.h"
+#include "atm6522.h"
+#include "atm6551.h"
 
 #pragma once
 #include <cstdint>
 #include <array>
 
-#include "olc6502.h"
-#include "olc2C02.h"
-#include "Cartridge.h"
-#include "LCD.h"
-#include "atm6522.h"
+// class Bus;
+
 
 class Bus
 {
@@ -76,10 +78,10 @@ public: // Devices on Main Bus
 	// The 6502 derived processor
 	olc6502 cpu;	
 	atm6522 via;
+	atm6551 acia;
 	// The 2C02 Picture Processing Unit
-	olc2C02 ppu;
+	// olc2C02 ppu;
 	// The Cartridge or "GamePak"
-	std::shared_ptr<Cartridge> cart;
 
 	LCD lcd;
 	// 32KB of RAM
@@ -90,13 +92,20 @@ public: // Main Bus Read & Write
 	void    cpuWrite(uint16_t addr, uint8_t data);
 	uint8_t cpuRead(uint16_t addr, bool bReadOnly = false);
 
+	void IRQ();
+	void NMI();
+
+	bool getNMI();
+	bool getIRQ();
+
 private:
 	// A count of how many clocks have passed
 	uint32_t nSystemClockCounter = 0;
+	bool irq = false, nmi = false;
 
 public: // System Interface
 	// Connects a cartridge object to the internal buses
-	void insertCartridge(const std::shared_ptr<Cartridge>& cartridge);
+	// void insertCartridge(const std::shared_ptr<Cartridge>& cartridge);
 	uint8_t loadROM(const std::string filename);
 	// Resets the system
 	void reset();

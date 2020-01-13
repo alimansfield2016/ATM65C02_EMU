@@ -74,6 +74,8 @@
 #include "include/olc6502.h"
 #include "include/Bus.h"
 
+extern bool interrupt;
+
 // Constructor
 olc6502::olc6502()
 {
@@ -197,7 +199,7 @@ void olc6502::reset()
 // has happened, in a similar way to a reset, a programmable address
 // is read form hard coded location 0xFFFE, which is subsequently
 // set to the program counter.
-void olc6502::irq()
+uint8_t olc6502::irq()
 {
 	// If interrupts are allowed
 	if (GetFlag(I) == 0)
@@ -210,11 +212,12 @@ void olc6502::irq()
 		stkp--;
 
 		// Then Push the status register to the stack
+		write(0x0100 + stkp, status);
+		stkp--;
+		// Now set interrupt blocking flags
 		SetFlag(B, 0);
 		SetFlag(U, 1);
 		SetFlag(I, 1);
-		write(0x0100 + stkp, status);
-		stkp--;
 
 		// Read new program counter location from fixed address
 		addr_abs = 0xFFFE;
@@ -224,25 +227,27 @@ void olc6502::irq()
 
 		// IRQs take time
 		cycles = 7;
+		return 1;
 	}
+	return 0;
 }
 
 
 // A Non-Maskable Interrupt cannot be ignored. It behaves in exactly the
 // same way as a regular IRQ, but reads the new program counter address
 // form location 0xFFFA.
-void olc6502::nmi()
+uint8_t olc6502::nmi()
 {
 	write(0x0100 + stkp, (pc >> 8) & 0x00FF);
 	stkp--;
 	write(0x0100 + stkp, pc & 0x00FF);
 	stkp--;
 
+	write(0x0100 + stkp, status);
+	stkp--;
 	SetFlag(B, 0);
 	SetFlag(U, 1);
 	SetFlag(I, 1);
-	write(0x0100 + stkp, status);
-	stkp--;
 
 	addr_abs = 0xFFFA;
 	uint16_t lo = read(addr_abs + 0);
@@ -258,10 +263,8 @@ void olc6502::clock()
 	if(stop)
 		return;
 
-	//handle interrupt
+	
 
-	if(wait)
-		return;
 	// Each instruction requires a variable number of clock cycles to execute.
 	// In my emulation, I only care about the final result and so I perform
 	// the entire computation in one hit. In hardware, each clock cycle would
@@ -274,6 +277,25 @@ void olc6502::clock()
 	// the next one is ready to be executed.
 	if (cycles == 0)
 	{
+	//handle interrupt
+		if(bus->getNMI()){
+			nmi();
+			wait = false;
+			interrupt = true;
+			return;
+		}
+		else if(bus->getIRQ()){
+			if(irq()){	
+				// printf("IRQ\n");
+				wait = false;
+				interrupt = true;
+				return;
+			}else{
+				// printf("IRQ disalbed\n");
+			}
+		}
+		else if(wait)
+			return;
 		// Read next instruction byte. This 8-bit value is used to index
 		// the translation table to get the relevant information about
 		// how to implement the instruction
@@ -1588,81 +1610,97 @@ uint8_t olc6502::BBS7(){
 }
 
 uint8_t olc6502::RMB0(){
+	fetch();
 	fetched &= ~0x01;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::RMB1(){
+	fetch();
 	fetched &= ~0x02;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::RMB2(){
+	fetch();
 	fetched &= ~0x04;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::RMB3(){
+	fetch();
 	fetched &= ~0x08;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::RMB4(){
+	fetch();
 	fetched &= ~0x10;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::RMB5(){
+	fetch();
 	fetched &= ~0x20;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::RMB6(){
+	fetch();
 	fetched &= ~0x40;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::RMB7(){
+	fetch();
 	fetched &= ~0x80;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::SMB0(){
+	fetch();
 	fetched |= 0x01;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::SMB1(){
+	fetch();
 	fetched |= 0x02;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::SMB2(){
+	fetch();
 	fetched |= 0x04;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::SMB3(){
+	fetch();
 	fetched |= 0x08;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::SMB4(){
+	fetch();
 	fetched |= 0x10;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::SMB5(){
+	fetch();
 	fetched |= 0x20;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::SMB6(){
+	fetch();
 	fetched |= 0x40;
 	write(addr_abs, fetched);
 	return 0;
 }
 uint8_t olc6502::SMB7(){
+	fetch();
 	fetched |= 0x80;
 	write(addr_abs, fetched);
 	return 0;
@@ -1863,8 +1901,16 @@ std::map<uint16_t, std::string> olc6502::disassemble(uint16_t nStart, uint16_t n
 		{
 			value = bus->cpuRead(addr, true); addr++;
 			sInst += "$" + hex(value, 2) + " [$" + hex(addr + (int8_t)value, 4) + "] {REL}";
+		}else if(lookup[opcode].addrmode == &olc6502::ZPI){
+			value = bus->cpuRead(addr, true); addr++;
+			sInst += "(" + hex(value, 2) + ") {ZPI}";
+		}else if(lookup[opcode].addrmode == &olc6502::ACC){
+			value = a;
+			sInst += hex(value, 2) + " {ACC}";
+		}else if(lookup[opcode].addrmode == &olc6502::AIX){
+			value = bus->cpuRead(addr, true) | bus->cpuRead(addr, true)<<8; addr+=2;
+			sInst += "(" + hex(value, 2) + ") {ZPI}";
 		}
-
 		// Add the formed string to a std::map, using the instruction's
 		// address as the key. This makes it convenient to look for later
 		// as the instructions are variable in length, so a straight up

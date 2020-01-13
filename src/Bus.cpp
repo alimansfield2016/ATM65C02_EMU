@@ -60,6 +60,7 @@ Bus::Bus()
 {
 	// Connect CPU to communication bus
 	cpu.ConnectBus(this);
+	via.ConnectBus(this);
 }
 
 
@@ -73,11 +74,13 @@ void Bus::cpuWrite(uint16_t addr, uint8_t data)
 	{
 		cpuRam[addr] = data;
 
-	}else if(addr >= 0x6000 && addr < 0x6400){
-		via.write(addr, data);	
-	}else if(addr >= 0x6400 && addr < 0x6800){
+	}else if(addr >= 0x6000 && addr < 0x67FF){
 		//LCD
 		lcd.write(addr, data);
+	}else if(addr >= 0x7000 && addr <= 0x77FF){
+		via.write(addr, data);	
+	}else if(addr >= 0x7800 && addr <= 0x7FFF){
+		acia.write(addr, data);	
 	}else if (addr >= 0x8000 && addr <= 0xFFFF)
 	{
 		cpuRom[addr-0x8000] =  data;
@@ -87,33 +90,33 @@ void Bus::cpuWrite(uint16_t addr, uint8_t data)
 uint8_t Bus::cpuRead(uint16_t addr, bool bReadOnly)
 {
 	uint8_t data = 0x00;	
-	if (addr >= 0x0000 && addr <= 0x5FFF)
-	{
+	if (addr >= 0x0000 && addr <= 0x5FFF){
 		data = cpuRam[addr];
-	}else if(addr >= 0x6000 && addr < 0x6400){
-		via.read(addr, data);	
-	}else if(addr >= 0x6400 && addr < 0x6800){
-		//LCD
+	}else if(addr >= 0x6000 && addr <= 0x67FF){
 		lcd.read(addr, data);
-	}else if (addr >= 0x8000 && addr <= 0xFFFF)
-	{
+	}else if(addr >= 0x7000 && addr <= 0x77FF){
+		via.read(addr, data);	
+	}else if(addr >= 0x7800 && addr <= 0x7FFF){
+		acia.read(addr, data);
+	}else if (addr >= 0x8000 && addr <= 0xFFFF){
 		data = cpuRom[addr-0x8000];
 	}
 
 	return data;
 }
 
-void Bus::insertCartridge(const std::shared_ptr<Cartridge>& cartridge)
-{
-	// Connects cartridge to both Main Bus and CPU Bus
-	this->cart = cartridge;
-	ppu.ConnectCartridge(cartridge);
-}
+// void Bus::insertCartridge(const std::shared_ptr<Cartridge>& cartridge)
+// {
+// 	// Connects cartridge to both Main Bus and CPU Bus
+// 	this->cart = cartridge;
+// 	ppu.ConnectCartridge(cartridge);
+// }
 
 void Bus::reset()
 {
 	cpu.reset();
 	nSystemClockCounter = 0;
+	via.reset();
 }
 
 void Bus::clock()
@@ -127,15 +130,16 @@ void Bus::clock()
 	// The fastest clock frequency the digital system cares
 	// about is equivalent to the PPU clock. So the PPU is clocked
 	// each time this function is called.
-	ppu.clock();
+	// ppu.clock();
 
 	// The CPU runs 3 times slower than the PPU so we only call its
 	// clock() function every 3 times this function is called. We
 	// have a global counter to keep track of this.
-	if (nSystemClockCounter % 3 == 0)
-	{
-		cpu.clock();
-	}
+	// if (nSystemClockCounter % 3 == 0)
+	// {
+	cpu.clock();
+	via.clock();
+	// }
 
 	nSystemClockCounter++;
 }
@@ -149,4 +153,21 @@ uint8_t Bus::loadROM(const std::string filename){
 		cpuRom[i] = byte;
 	}
 	return 0;
+}
+
+void Bus::IRQ(){
+	irq = true;
+}
+void Bus::NMI(){
+	nmi = true;
+}
+bool Bus::getIRQ(){
+	bool out = irq;
+	irq = false;
+	return out;
+}
+bool Bus::getNMI(){
+	bool out = nmi;
+	nmi = false;
+	return out;
 }

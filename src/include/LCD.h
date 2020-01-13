@@ -12,6 +12,7 @@ public:
 	uint8_t write(uint16_t addr, uint8_t data);
 	olc::Sprite& GetScreen();//return lcd_display	
 	void redraw(float f_time);
+	void unInit();
 
 private:
 	enum FUNCTION{
