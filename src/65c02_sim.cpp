@@ -54,6 +54,13 @@
 	David Barr, aka javidx9, �OneLoneCoder 2019
 */
 
+/*
+	Modified from original by: Ali Mansfield
+	Original author: as stated above
+	Licence: as stated above
+
+*/
+
 #include <iostream>
 #include <sstream>
 
@@ -77,10 +84,8 @@ public:
 	atm65c22_emu() { sAppName = "6502 emulator"; }
 
 private: 
-	// The NES
-	Bus nes;
+	Bus bus;
 	atmKeyboard KB;
-	// std::vector<uint8_t> ROM;
 	bool bEmulationRun = false;
 	float fResidualTime = 0.0f;
 	float fTotalTime = 0.0f;
@@ -107,7 +112,7 @@ private:
 			std::string sOffset = "$" + hex(nAddr, 4) + ":";
 			for (int col = 0; col < nColumns; col++)
 			{
-				sOffset += " " + hex(nes.cpuRead(nAddr, true), 2);
+				sOffset += " " + hex(bus.cpuRead(nAddr, true), 2);
 				nAddr += 1;
 			}
 			DrawString(nRamX, nRamY, sOffset);
@@ -119,31 +124,31 @@ private:
 	{
 		std::string status = "STATUS: ";
 		DrawString(x , y , "STATUS:", olc::WHITE);
-		DrawString(x  + 64, y, "N", nes.cpu.status & olc6502::N ? olc::GREEN : olc::RED);
-		DrawString(x  + 80, y , "V", nes.cpu.status & olc6502::V ? olc::GREEN : olc::RED);
-		DrawString(x  + 96, y , "-", nes.cpu.status & olc6502::U ? olc::GREEN : olc::RED);
-		DrawString(x  + 112, y , "B", nes.cpu.status & olc6502::B ? olc::GREEN : olc::RED);
-		DrawString(x  + 128, y , "D", nes.cpu.status & olc6502::D ? olc::GREEN : olc::RED);
-		DrawString(x  + 144, y , "I", nes.cpu.status & olc6502::I ? olc::GREEN : olc::RED);
-		DrawString(x  + 160, y , "Z", nes.cpu.status & olc6502::Z ? olc::GREEN : olc::RED);
-		DrawString(x  + 178, y , "C", nes.cpu.status & olc6502::C ? olc::GREEN : olc::RED);
-		DrawString(x , y + 10, "PC: $" + hex(nes.cpu.pc, 4));
-		DrawString(x , y + 20, "A: $" +  hex(nes.cpu.a, 2) + "  [" + std::to_string(nes.cpu.a) + "]");
-		DrawString(x , y + 30, "X: $" +  hex(nes.cpu.x, 2) + "  [" + std::to_string(nes.cpu.x) + "]");
-		DrawString(x , y + 40, "Y: $" +  hex(nes.cpu.y, 2) + "  [" + std::to_string(nes.cpu.y) + "]");
-		DrawString(x , y + 50, "Stack P: $" + hex(nes.cpu.stkp+0x100, 4));
-		DrawString(x , y + 60, "CPU Cycles: " + std::to_string(nes.cpu.GetClockCount()));
+		DrawString(x  + 64, y, "N", bus.cpu.status & olc6502::N ? olc::GREEN : olc::RED);
+		DrawString(x  + 80, y , "V", bus.cpu.status & olc6502::V ? olc::GREEN : olc::RED);
+		DrawString(x  + 96, y , "-", bus.cpu.status & olc6502::U ? olc::GREEN : olc::RED);
+		DrawString(x  + 112, y , "B", bus.cpu.status & olc6502::B ? olc::GREEN : olc::RED);
+		DrawString(x  + 128, y , "D", bus.cpu.status & olc6502::D ? olc::GREEN : olc::RED);
+		DrawString(x  + 144, y , "I", bus.cpu.status & olc6502::I ? olc::GREEN : olc::RED);
+		DrawString(x  + 160, y , "Z", bus.cpu.status & olc6502::Z ? olc::GREEN : olc::RED);
+		DrawString(x  + 178, y , "C", bus.cpu.status & olc6502::C ? olc::GREEN : olc::RED);
+		DrawString(x , y + 10, "PC: $" + hex(bus.cpu.pc, 4));
+		DrawString(x , y + 20, "A: $" +  hex(bus.cpu.a, 2) + "  [" + std::to_string(bus.cpu.a) + "]");
+		DrawString(x , y + 30, "X: $" +  hex(bus.cpu.x, 2) + "  [" + std::to_string(bus.cpu.x) + "]");
+		DrawString(x , y + 40, "Y: $" +  hex(bus.cpu.y, 2) + "  [" + std::to_string(bus.cpu.y) + "]");
+		DrawString(x , y + 50, "Stack P: $" + hex(bus.cpu.stkp+0x100, 4));
+		DrawString(x , y + 60, "CPU Cycles: " + std::to_string(bus.cpu.GetClockCount()));
 	}
 
 	void DrawCode(int x, int y, int nLines)
 	{
 		//put the start of the disassembly way further than needed
 		//so that any instruction misalignments fix themselves
-		uint16_t addr_start = nes.cpu.pc-0x40;
-		uint16_t addr_end   = nes.cpu.pc+0x40;
+		uint16_t addr_start = bus.cpu.pc-0x40;
+		uint16_t addr_end   = bus.cpu.pc+0x40;
 		
-		std::map<uint16_t, std::string> new_mapAsm = nes.cpu.disassemble(addr_start, addr_end);
-		auto it_a = new_mapAsm.find(nes.cpu.pc);
+		std::map<uint16_t, std::string> new_mapAsm = bus.cpu.disassemble(addr_start, addr_end);
+		auto it_a = new_mapAsm.find(bus.cpu.pc);
 		int nLineY = (nLines >> 1) * 10 + y;
 		if (it_a != new_mapAsm.end())
 		{
@@ -158,7 +163,7 @@ private:
 			}
 		}
 
-		it_a = new_mapAsm.find(nes.cpu.pc);
+		it_a = new_mapAsm.find(bus.cpu.pc);
 		nLineY = (nLines >> 1) * 10 + y;
 		if (it_a != new_mapAsm.end())
 		{
@@ -197,32 +202,21 @@ private:
 
 	bool OnUserCreate()
 	{
-		// Load the cartridge
-		// cart = std::make_shared<Cartridge>("nestest.nes");
-		// if (!cart->ImageValid())
-		// 	return false;
-
-		// Insert into NES
-		// nes.insertCartridge(cart);
-
-
-
-
 
 		for(uint16_t i = 0; i < 65535; i++){
-			nes.cpuWrite(i, 0);
-			nes.lcd.unInit();
-			nes.via.write(0x000E, ~0x80);
+			bus.cpuWrite(i, 0);
+			bus.lcd.unInit();
+			bus.via.write(0x000E, ~0x80);
 		}
-		if(nes.loadROM("65c02.rom") != 0){
+		if(bus.loadROM("65c02.rom") != 0){
 			return false;
 		}
 		// Extract dissassembly
-		mapAsm = nes.cpu.disassemble(0x0000, 0xFFFF);
-		KB.ConnectVIA(&nes.via);
-		nes.via.ConnectKeyboard(&KB);
-		// Reset NES
-		nes.reset();
+		mapAsm = bus.cpu.disassemble(0x0000, 0xFFFF);
+		KB.ConnectVIA(&bus.via);
+		bus.via.ConnectKeyboard(&KB);
+		// Reset system
+		bus.reset();
 		return true;
 	}
 
@@ -234,7 +228,7 @@ private:
 		static uint8_t page = 2;
 		if(bEmulationRun){
 			for(float cycles = fElapsedTime*CPU_FREQ; cycles > 0 && !(interrupt && int_pause); cycles-= 1.0/1.8432000){
-				nes.acia.clock();
+				bus.acia.clock();
 
 				if(fmod(cycles, (CPU_FREQ/(KB_FREQ*2.0)) ) < 1.0/1.8432000 ){
 					//clock the KB twice (H/L) at 10khz
@@ -242,9 +236,9 @@ private:
 				}
 
 				if(fmod(cycles, 1.0) < 1.0/1.8432000 ){
-					nes.clock();
+					bus.clock();
 					if(wait_for_return){
-						if(nes.cpu.returned()){
+						if(bus.cpu.returned()){
 							bEmulationRun = false;
 							wait_for_return = false;
 							cycles = 0;
@@ -264,28 +258,28 @@ private:
 			if (GetKey(olc::Key::C).bPressed)
 			{
 				if(GetKey(olc::Key::LSHIFT).bHeld){
-					nes.clock();
+					bus.clock();
 				}else{
 					// Clock enough times to execute a whole CPU instruction
-					do { nes.clock(); } while (!nes.cpu.complete() && !(interrupt && int_pause));
+					do { bus.clock(); } while (!bus.cpu.complete() && !(interrupt && int_pause));
 					// CPU clock runs slower than system clock, so it may be
 					// complete for additional system clock cycles. Drain
 					// those out
-					do { nes.clock(); } while (nes.cpu.complete() && !(interrupt && int_pause));
+					do { bus.clock(); } while (bus.cpu.complete() && !(interrupt && int_pause));
 				}
 			}else if(GetKey(olc::Key::C).bHeld){
 				key_hold++;
 				if(key_hold > 30){
 				if(GetKey(olc::Key::LSHIFT).bHeld)
-					nes.clock();
+					bus.clock();
 				else
-					do { nes.clock(); } while (!nes.cpu.complete() && !(interrupt && int_pause));
+					do { bus.clock(); } while (!bus.cpu.complete() && !(interrupt && int_pause));
 				}
 			}else{
 				key_hold = 0;
 			}
 			if(GetKey(olc::Key::E).bPressed){
-				nes.cpu.wait_return();
+				bus.cpu.wait_return();
 				wait_for_return = true;
 				bEmulationRun = true;
 			}
@@ -296,7 +290,7 @@ private:
 					//hard reset of emulator
 					OnUserCreate();
 				}else
-					nes.reset();		
+					bus.reset();		
 
 			} 
 			if(GetKey(olc::Key::LCTRL).bHeld && GetKey(olc::Key::C).bPressed)
@@ -338,11 +332,11 @@ private:
 		DrawCode(495, 82, 20);
 		DrawRam(4, 75, 0x0000, 16, 16);
 		DrawRam(4, 240, page << 8, 16, 16);
-		DrawStack(495, 300, 0x20-nes.cpu.stkp);
-		nes.lcd.redraw(fTotalTime);
-		nes.via.redraw();
-		DrawSprite(440, 75, &nes.via.GetScreen(), 1);
-		DrawSprite(1, 1, &nes.lcd.GetScreen(), 2);
+		DrawStack(495, 300, 0x20-bus.cpu.stkp);
+		bus.lcd.redraw(fTotalTime);
+		bus.via.redraw();
+		DrawSprite(440, 75, &bus.via.GetScreen(), 1);
+		DrawSprite(1, 1, &bus.lcd.GetScreen(), 2);
 		DrawControls(15, 525);
 		return true;
 	}
