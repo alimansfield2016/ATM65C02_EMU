@@ -73,7 +73,7 @@
 #endif
 
 #define OLC_PGE_APPLICATION
-#include <personal/olcPixelGameEngine.h>
+#include "include/olcPixelGameEngine.h"
 
 #define KB_FREQ  1.0/0.000070 	//70us period
 #define KB_FREQ  10000.0	 	//70us period

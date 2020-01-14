@@ -23,21 +23,21 @@
 #define ROM_END	 	0xFFFF
 
 // For use when LCD simulated connection to VIA, select between data on PORTA or PORTB
-// #define LCD_PORTA
-#define LCD_PORTB
+#define LCD_PORTA
+// #define LCD_PORTB
 
 #define LCD_SW_RS_RW
 
+// #define LCD_NO_DELAY
 
 #else
 
-// #define LCD_NO_DELAY
 
 #define LCDW 		40
 #define LCDH 		4
 #define LCD_NDISP 	2
-#define LCDX		1
-#define LCDY		1
+#define LCDX		2
+#define LCDY		2
 #define LCD_BUS
 
 #define LCD_START 	0x6000

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <personal/olcPixelGameEngine.h>
+#include "olcPixelGameEngine.h"
 #include <stdint.h>
 
 typedef uint8_t u8;

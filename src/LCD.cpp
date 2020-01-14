@@ -197,6 +197,11 @@ void LCD::redraw(float f_time){
 				}
 			}
 		}
+		for(int j = 0; j < 9; j++){
+			for(int k = 0; k < n_disp; k++){
+				lcd_display.SetPixel(i*6+j, lcd_display.width-1+k, n_busy_ticks[k]<i*6+j?olc::DARK_BLUE:olc::YELLOW);
+			}
+		}
 	}
 }
 

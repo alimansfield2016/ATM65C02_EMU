@@ -1,7 +1,7 @@
 
 #include "include/atmKeyboard.h"
 #include "include/atm6522.h"
-#include <personal/olcPixelGameEngine.h>
+#include "include/olcPixelGameEngine.h"
 
 #include <stdio.h>
 

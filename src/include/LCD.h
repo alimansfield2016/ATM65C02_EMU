@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include <personal/olcPixelGameEngine.h>
+#include "olcPixelGameEngine.h"
 #include "config.h"
 #include "atm6522.h"
 
@@ -53,7 +53,7 @@ private:
 	bool b_cursor_blink[n_disp] = {false};
 	uint16_t n_busy_ticks[n_disp] = {false};
 
-	olc::Sprite lcd_display = olc::Sprite(n_w*6-1, n_h*9-1); 
+	olc::Sprite lcd_display = olc::Sprite(n_w*6-1 + n_disp, n_h*9-1); 
 	olc::Pixel BG = olc::Pixel(0, 0, 255);
 	olc::Pixel FG = olc::Pixel(255, 255, 255);
 
