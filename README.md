@@ -47,13 +47,15 @@ Two memory views are also available. The first contains the ZP, the second is se
 ## LCD
 
 The LCD is an emulation of the Hitachi HD44780 LCD controller. It supports nearly any size of LCD, except 20x4 ( it might but i havent tested it soo...). It supports up to the 40x4, which requires two enable lines. 
+This implementation of the HD47780 controller also supports LCD timings, so that once a command is executed, The controller will not accept any other commands/data until the execution time has expired.
 
-The LCD is connected directly to the system bus (contrary to the original design which used the output ports on the VIA), but this can be configured fairly easily with a different assembly 'driver' for it.
 
 Functionally the LCD is almost 100% complete, but is otherwise completely useable. 
 
 By default, the LCD is connected to the VIA on PORTB, with the upper 3 bits of PORTA as the control lines, RS, RWB, EN.
+
 Alternatively in the advanced configuration, the LCD is addressable in the region $6000 - $67FF. The register select is connected to A0, and \[A1:A2\] are the enable lines when used in 40x4 (default for advanced) 
+In the advanced configuration, the LCD is connected directly to the system bus (contrary to the original design which used the output ports on the VIA), but this can be configured fairly easily with a different assembly 'driver' for it.
 
 ## 65C22 VIA
 

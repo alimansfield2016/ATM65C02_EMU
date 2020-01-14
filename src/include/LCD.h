@@ -15,8 +15,8 @@ public:
 	olc::Sprite& GetScreen();//return lcd_display	
 	void redraw(float f_time);
 	void unInit();
+	void clock();
 	#ifndef LCD_BUS
-	void update();
 	void ConnectVIA(atm6522* v);
 	#endif
 
@@ -51,6 +51,7 @@ private:
 	bool b_disp_on[n_disp] = {false};
 	bool b_cursor_on[n_disp] = {false};
 	bool b_cursor_blink[n_disp] = {false};
+	uint16_t n_busy_ticks[n_disp] = {false};
 
 	olc::Sprite lcd_display = olc::Sprite(n_w*6-1, n_h*9-1); 
 	olc::Pixel BG = olc::Pixel(0, 0, 255);

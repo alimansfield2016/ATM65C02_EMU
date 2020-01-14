@@ -246,19 +246,19 @@ private:
 		static uint32_t key_hold = 0, kh_up = 0, kh_dn = 0, kh_l = 0, kh_r = 0;
 		static uint8_t page = 2;
 		if(bEmulationRun){
-			for(float cycles = fElapsedTime*CPU_FREQ; cycles > 0 && !(interrupt && int_pause); cycles-= 1.0/1.8432000){
+			for(float cycles = fElapsedTime*CPU_FREQ; cycles > 0 && !(interrupt && int_pause); cycles-= TIMESTEP){
 				bus.acia.clock();
 				#ifdef KB
-				if(fmod(cycles, (CPU_FREQ/(KB_FREQ*2.0)) ) < 1.0/1.8432000 ){
+				if(fmod(cycles, (CPU_FREQ/(KB_FREQ*2.0)) ) < TIMESTEP ){
 					//clock the KB twice (H/L) at 10khz
 					kb.clock();
 				}
 				#endif
+				if(fmod(cycles, CPU_FREQ/LCD_FREQ) < TIMESTEP){
+					bus.lcd.clock();
+				}
 
 				if(fmod(cycles, 1.0) < 1.0/1.8432000 ){
-					#ifndef LCD_BUS
-					bus.lcd.update();
-					#endif
 					bus.clock();
 					if(wait_for_return){
 						if(bus.cpu.returned()){

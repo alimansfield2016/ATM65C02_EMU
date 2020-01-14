@@ -28,9 +28,10 @@
 
 #define LCD_SW_RS_RW
 
- 
 
 #else
+
+// #define LCD_NO_DELAY
 
 #define LCDW 		40
 #define LCDH 		4
@@ -60,6 +61,10 @@
 #ifndef CPU_FREQ
 #define CPU_FREQ 1000000.0		//1MHz
 #endif
+
+#define LCD_FREQ 270000.0	//lcd clock runs at 270KHz
+
+#define TIMESTEP 1.0/1.8432000
 
 
 //If any of the address ranges are left undefined, we default them to start > end so that they can never be addressed
