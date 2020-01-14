@@ -178,3 +178,50 @@ void LCD::unInit(){
 		b = false;
 	}
 }
+
+#ifndef LCD_BUS
+
+void LCD::update(){
+	uint8_t control = 
+	#ifdef LCD_PORTA
+		(via->getB() << 6 - LCD_NDISP) >> 6-LCD_NDISP;
+	#else
+		#ifdef LCD_PORTB
+			via->getA() >> 6- LCD_NDISP;
+		#else
+			0;
+		#endif
+	#endif
+	#ifdef LCD_SW_RS_RW
+	uint8_t tmp = control;
+	control &= ~0x03;
+	control |= tmp>>1&0x01;
+	control |= tmp<<1&0x02;
+	#endif
+	if(ctrl_state == control) return;
+	if(control & 0x01){
+		//RWB = 1, Read from display
+	}else{
+		//write to display
+
+		uint8_t via_data = 
+		#ifdef LCD_PORTA
+			via->getA();
+		#else
+			#ifdef LCD_PORTB
+				via->getB();
+			#else
+				0;
+			#endif
+		#endif
+
+		write(control >> 1, via_data);
+	}
+	ctrl_state = control;
+}
+
+void LCD::ConnectVIA(atm6522* v){
+	via = v;
+}
+
+#endif

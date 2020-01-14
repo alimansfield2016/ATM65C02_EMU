@@ -54,7 +54,7 @@
 	David Barr, aka javidx9, �OneLoneCoder 2019
 */
 
- 
+#include "config.h"
 #include "olc6502.h"
 #include "LCD.h"
 #include "atm6522.h"
@@ -77,11 +77,8 @@ public: // Devices on Main Bus
 
 	// The 6502 derived processor
 	olc6502 cpu;	
-	atm6522 via;
+	atm6522 via, via2;
 	atm6551 acia;
-	// The 2C02 Picture Processing Unit
-	// olc2C02 ppu;
-	// The Cartridge or "GamePak"
 
 	LCD lcd;
 	// 32KB of RAM

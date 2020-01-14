@@ -109,7 +109,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%$(EXT)
 # Cleans complete project
 .PHONY: clean
 clean:
-	$(RM) $(DELOBJ) $(DEP) $(APPNAME) $(EXPORTED_DOCS) ${PEDA_SESS}
+	$(RM) $(DELOBJ) $(DEP) $(APPNAME) # $(EXPORTED_DOCS) ${PEDA_SESS}
 
 # Cleans only all files with the extension .d
 .PHONY: cleandep

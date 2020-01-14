@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <personal/olcPixelGameEngine.h>
+#include "config.h"
+#include "atm6522.h"
 
 class LCD{
 public:
@@ -13,8 +15,17 @@ public:
 	olc::Sprite& GetScreen();//return lcd_display	
 	void redraw(float f_time);
 	void unInit();
+	#ifndef LCD_BUS
+	void update();
+	void ConnectVIA(atm6522* v);
+	#endif
 
 private:
+	#ifndef LCD_BUS
+	atm6522* via;
+	uint8_t ctrl_state = 0;
+	#endif
+
 	enum FUNCTION{
 		clear_disp = 0x01,
 		ret_home = 0x02,
@@ -26,8 +37,8 @@ private:
 		set_ddram_addr = 0x80
 	};
 
-	static const int n_w = 40, n_h = 4;
-	static const int n_disp = 2;	//one display per two lines
+	static const int n_w = LCDW, n_h = LCDH;
+	static const int n_disp = LCD_NDISP;	//one display per two lines
 	
 	uint8_t n_ddram_addr[n_disp], n_cgram_addr[n_disp];
 	uint8_t n_ddram[n_disp][128], n_cgram[n_disp][64];

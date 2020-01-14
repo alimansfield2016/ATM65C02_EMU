@@ -64,19 +64,23 @@
 #include <iostream>
 #include <sstream>
 
+#include "include/config.h"
+
 #include "include/Bus.h"
 #include "include/olc6502.h"
+#ifdef KB
 #include "include/atmKeyboard.h"
+#endif
 
 #define OLC_PGE_APPLICATION
 #include <personal/olcPixelGameEngine.h>
 
-#define CPU_FREQ 1000000.0		//1MHz
 #define KB_FREQ  1.0/0.000070 	//70us period
 #define KB_FREQ  10000.0	 	//70us period
 
 bool interrupt = false;
-
+char* rom_default = "65c02.rom";
+char* rom_file;
 
 class atm65c22_emu : public olc::PixelGameEngine
 {
@@ -85,7 +89,9 @@ public:
 
 private: 
 	Bus bus;
-	atmKeyboard KB;
+	#ifdef KB
+	atmKeyboard kb;
+	#endif
 	bool bEmulationRun = false;
 	float fResidualTime = 0.0f;
 	float fTotalTime = 0.0f;
@@ -184,19 +190,26 @@ private:
 
 	void DrawControls(int x, int y){
 		std::string text = "KB ";
+		uint8_t offset = 0;
+		#ifdef KB
 		DrawString(x, y, text, bKeyboardInput?olc::GREEN:olc::RED);
+		offset += 3;
 		text = "<INS>|";
-		DrawString(x + 3*7, y, text);
-
+		DrawString(x + offset*7, y, text);
+		offset += 7;
+		#endif
 		text = bEmulationRun?" RUN  ":"PAUSE ";
-		DrawString(x + 10*7, y, text, bEmulationRun?olc::GREEN:olc::RED);
+		DrawString(x + offset*7, y, text, bEmulationRun?olc::GREEN:olc::RED);
+		offset += 6;
 		text = "<SPACE>| ";
-		DrawString(x + 16*7, y, text);
+		DrawString(x + offset*7, y, text);
+		offset += 9;
 
 		text = " BRK ";
-		DrawString(x + 25*7, y, text, int_pause?olc::GREEN:olc::RED);
+		DrawString(x + offset*7, y, text, int_pause?olc::GREEN:olc::RED);
+		offset += 5;
 		text = "<I>| ";
-		DrawString(x+30*7, y, text);
+		DrawString(x+offset*7, y, text);
 	}
 
 
@@ -206,15 +219,21 @@ private:
 		for(uint16_t i = 0; i < 65535; i++){
 			bus.cpuWrite(i, 0);
 			bus.lcd.unInit();
-			bus.via.write(0x000E, ~0x80);
 		}
-		if(bus.loadROM("65c02.rom") != 0){
+		bus.via.write(0x000E, ~0x80);
+		if(bus.loadROM(rom_file) != 0){
+			printf("ROM Binary file \"%s\" not found!\n", rom_file);
 			return false;
 		}
 		// Extract dissassembly
 		mapAsm = bus.cpu.disassemble(0x0000, 0xFFFF);
-		KB.ConnectVIA(&bus.via);
-		bus.via.ConnectKeyboard(&KB);
+		#ifdef KB
+		kb.ConnectVIA(&bus.via);
+		bus.via.ConnectKeyboard(&kb);
+		#endif
+		#ifndef LCD_BUS
+		bus.lcd.ConnectVIA(&bus.via);
+		#endif
 		// Reset system
 		bus.reset();
 		return true;
@@ -229,13 +248,17 @@ private:
 		if(bEmulationRun){
 			for(float cycles = fElapsedTime*CPU_FREQ; cycles > 0 && !(interrupt && int_pause); cycles-= 1.0/1.8432000){
 				bus.acia.clock();
-
+				#ifdef KB
 				if(fmod(cycles, (CPU_FREQ/(KB_FREQ*2.0)) ) < 1.0/1.8432000 ){
 					//clock the KB twice (H/L) at 10khz
-					KB.clock();
+					kb.clock();
 				}
+				#endif
 
 				if(fmod(cycles, 1.0) < 1.0/1.8432000 ){
+					#ifndef LCD_BUS
+					bus.lcd.update();
+					#endif
 					bus.clock();
 					if(wait_for_return){
 						if(bus.cpu.returned()){
@@ -248,10 +271,12 @@ private:
 				}
 			}
 		}
+		#ifdef KB
 		if(GetKey(olc::Key::INS).bPressed){
 			bKeyboardInput = !bKeyboardInput;
-			KB.setState(bKeyboardInput);
+			kb.setState(bKeyboardInput);
 		}
+		#endif
 
 		if(!bKeyboardInput){
 			// Emulate code step-by-step
@@ -336,7 +361,11 @@ private:
 		bus.lcd.redraw(fTotalTime);
 		bus.via.redraw();
 		DrawSprite(440, 75, &bus.via.GetScreen(), 1);
-		DrawSprite(1, 1, &bus.lcd.GetScreen(), 2);
+		#ifdef VIA2
+		bus.via2.redraw();
+		DrawSprite(440, 220, &bus.via2.GetScreen(), 1);
+		#endif
+		DrawSprite(LCDX, LCDY, &bus.lcd.GetScreen(), 2);
 		DrawControls(15, 525);
 		return true;
 	}
@@ -347,8 +376,13 @@ private:
 
 atm65c22_emu demo;
 
-int main()
+int main(int argc, char* argv[])
 {
+	if(argc == 2){
+		rom_file = argv[1];
+	}else{
+		rom_file = rom_default;
+	}
 	demo.Construct(960, 540, 2, 2);
 	demo.Start();
 	return 0;

@@ -5,6 +5,37 @@ This was a little project I thought could be useful to people for developing ass
 
 I also added other functionality such as the LCD, VIA, and the ACIA is a work in progress
 
+## Configuration of the emulator
+
+Configuration of the ATM65C02 Emulator is fairly simple. The source contains a file [config.h](src/include/config.h). This has both a default configuration, useable by defining `CONFIG_STD`, which is representative of the Ben Eater schematics, and an advanced configuration, with a 40x4 LCD connected directly to the bus, 2 VIAs, etc.
+
+This file contains almost all of the options for the emulator that can be configured at complile/build time. These include:
+```c
+#define LCDW		// Character width of the LCD 		(Default=16)
+#define LCDH		// Character height of the LCD		(Default=2)
+#define LCD_NDISP	// Number of emulated display controllers. This is necessary for the larger LCDs such as 40x4, which require a separate controller for the top two and bottom two lines
+#define LCDX		// X position to draw the LCD at on the GUI
+#define LCDY		// Y position to draw the LCD at on the GUI
+#define LCD_BUS		// If defined, the LCD will be connected directly to the system bus, rather than being connected through the VIA
+#define LCD_PORTA	// If defined, the LCD will use PORTA of the VIA as the data word, and the lower bits of PORTB for the control.
+#define LCD_PORTB	// If defined, the LCD will use PORTB of the VIA as the data word, and the upper bits of PORTA for the control. 
+#define LCD_SW_RS_RW	// If defined, the RS and RWB control lines from the VIA will be RS, RWB, EN. rather than RWB, RS, EN. 
+```
+
+Each element on the bus also has definitions of it's mapped memory space:
+```c
+#define SRAM_START	0x0000
+#define SRAM_END	0x3FFF
+
+//There are other definitions for the:
+//	LCD
+//	VIA
+//	VIA2 (If used)
+// 	ACIA
+
+//If any of these are left undefined, They will be mapped a negative memory region, and will not be accessed by the bus.
+```
+
 ## 65C02
 
 The emulated 65C02 core is a timing accurate, but not cycle accurate emulation (i think that's the right way to put it?). Basically, every instruction lasts the correct number of clock cycles, but micro-operations such as reading each byte of the instruction all happen in the first clock cycle, and idles for the remaining cycles of the instruction. Interupts via the IRQ and NMI are fully supported.
@@ -21,13 +52,16 @@ The LCD is connected directly to the system bus (contrary to the original design
 
 Functionally the LCD is almost 100% complete, but is otherwise completely useable. 
 
-The LCD is addressable in the region $6000 - $67FF. The register select is connected to A0, and \[A1:A2\] are the enable lines when used in 40x4 (default) 
+By default, the LCD is connected to the VIA on PORTB, with the upper 3 bits of PORTA as the control lines, RS, RWB, EN.
+Alternatively in the advanced configuration, the LCD is addressable in the region $6000 - $67FF. The register select is connected to A0, and \[A1:A2\] are the enable lines when used in 40x4 (default for advanced) 
 
 ## 65C22 VIA
 
 So far, I have also implemented the 65C22 VIA to the system. It has both PORTs, which can be input or output, full interrupt support on CA and CB. The two timers are also fully functional. The only thing that is not 100% complete is the shift register at the moment.
 
-The 65C22 is addressable in the region $7000 - $77FF
+With the standard configuration, the 65C22 is addressable in the region $6000 - $7FFF.
+The address mapping range of the VIA can be changed using the configuration file.
+A second VIA can be added to the system by defining `VIA2` in the `config.h` file.
 
 ## PS/2 Keyboard
 

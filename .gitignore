@@ -1,6 +1,7 @@
 dep/*
 obj/*
-65c02.rom 
+*.rom 
+*.rom
 myapp
 .vscode/*
 .VSCodeCounter/*

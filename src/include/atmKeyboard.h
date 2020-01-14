@@ -22,10 +22,11 @@ private:
 	atm6522* via;
 
 	bool kb_on = false;
-	bool typematic = false;
+	bool typematic = true;
 	uint16_t typematic_delay = 500;		// 500ms
 	uint16_t typematic_rate = 109;		// 10.9cps - 10.9*100ms
 	uint16_t typematic_timeout;
+	std::list<uint8_t> typematic_code;
 
 	bool keyState[256];
 	bool prevKeyState[256];

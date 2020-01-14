@@ -335,11 +335,17 @@ void a::setA(u8 in){
 void a::clrA(u8 in){
 	PORTA &= ~(in&~DDRA);
 }
+uint8_t a::getA(){
+	return PORTA & DDRA;
+}
 void a::setB(u8 in){
 	PORTB |= in&~DDRB;
 }
 void a::clrB(u8 in){
 	PORTB &= ~(in&~DDRB);
+}
+uint8_t a::getB(){
+	return PORTB & DDRB;
 }
 
 

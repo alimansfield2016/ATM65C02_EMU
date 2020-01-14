@@ -61,6 +61,7 @@ Bus::Bus()
 	// Connect CPU to communication bus
 	cpu.ConnectBus(this);
 	via.ConnectBus(this);
+	via2.ConnectBus(this);
 }
 
 
@@ -70,35 +71,43 @@ Bus::~Bus()
 
 void Bus::cpuWrite(uint16_t addr, uint8_t data)
 {	
-	if (addr >= 0x0000 && addr <= 0x5FFF)
+	if (addr >= SRAM_START && addr <= SRAM_END)
 	{
 		cpuRam[addr] = data;
 
-	}else if(addr >= 0x6000 && addr < 0x67FF){
+	}else if(addr >= LCD_START && addr < LCD_END){
 		//LCD
+		#ifdef LCD_BUS
 		lcd.write(addr, data);
-	}else if(addr >= 0x7000 && addr <= 0x77FF){
+		#endif
+	}else if(addr >= VIA_START && addr <= VIA_END){
 		via.write(addr, data);	
-	}else if(addr >= 0x7800 && addr <= 0x7FFF){
+	}else if(addr >= VIA2_START && addr <= VIA2_END){
+		via2.write(addr, data);
+	}else if(addr >= ACIA_START && addr <= ACIA_END){
 		acia.write(addr, data);	
-	}else if (addr >= 0x8000 && addr <= 0xFFFF)
-	{
+	}else if (addr >= ROM_START && addr <= ROM_END){
 		cpuRom[addr-0x8000] =  data;
 	}		
+	
 }
 
 uint8_t Bus::cpuRead(uint16_t addr, bool bReadOnly)
 {
 	uint8_t data = 0x00;	
-	if (addr >= 0x0000 && addr <= 0x5FFF){
+	if (addr >= SRAM_START && addr <= SRAM_END){
 		data = cpuRam[addr];
-	}else if(addr >= 0x6000 && addr <= 0x67FF){
+	}else if(addr >= LCD_START && addr <= LCD_END){
+		#ifdef LCD_BUS
 		lcd.read(addr, data);
-	}else if(addr >= 0x7000 && addr <= 0x77FF){
+		#endif
+	}else if(addr >= VIA_START && addr <= VIA_END){
 		via.read(addr, data);	
-	}else if(addr >= 0x7800 && addr <= 0x7FFF){
+	}else if(addr >= VIA2_START && addr <= VIA2_END){
+		via2.read(addr, data);
+	}else if(addr >= ACIA_START && addr <= ACIA_END){
 		acia.read(addr, data);
-	}else if (addr >= 0x8000 && addr <= 0xFFFF){
+	}else if (addr >= ROM_START && addr <= ROM_END){
 		data = cpuRom[addr-0x8000];
 	}
 
@@ -139,6 +148,7 @@ void Bus::clock()
 	// {
 	cpu.clock();
 	via.clock();
+	via2.clock();
 	// }
 
 	nSystemClockCounter++;

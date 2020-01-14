@@ -31,8 +31,10 @@ public:
 	void cb1(bool cb2);
 	void setA(u8 in);
 	void clrA(u8 in);
+	uint8_t getA();
 	void setB(u8 in);
 	void clrB(u8 in);
+	uint8_t getB();
 
 	void setCA(bool ca1, bool ca2);
 	void setCB(bool cb1, bool cb2);
