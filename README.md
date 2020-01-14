@@ -5,6 +5,14 @@ This was a little project I thought could be useful to people for developing ass
 
 I also added other functionality such as the LCD, VIA, and the ACIA is a work in progress
 
+### Dependancies
+This emulator has a couple of unfortunate dependencies, mostly because the graphical window runs using opengl. The dependencies for linux are:
+'''
+libpng-dev
+mesa-common-dev
+'''
+Depending on your distribution, you may use 'apt', 'yum' or whichever supported package manager you use to install these.
+
 ## Configuration of the emulator
 
 Configuration of the ATM65C02 Emulator is fairly simple. The source contains a file [config.h](src/include/config.h). This has both a default configuration, useable by defining `CONFIG_STD`, which is representative of the Ben Eater schematics, and an advanced configuration, with a 40x4 LCD connected directly to the bus, 2 VIAs, etc.
