@@ -75,12 +75,8 @@
 #define OLC_PGE_APPLICATION
 #include "include/olcPixelGameEngine.h"
 
-#define KB_FREQ  1.0/0.000070 	//70us period
-#define KB_FREQ  10000.0	 	//70us period
-
 bool interrupt = false;
-char* rom_default = "65c02.rom";
-char* rom_file;
+std::string rom_file = "65c02.rom";
 
 class atm65c22_emu : public olc::PixelGameEngine
 {
@@ -380,8 +376,6 @@ int main(int argc, char* argv[])
 {
 	if(argc == 2){
 		rom_file = argv[1];
-	}else{
-		rom_file = rom_default;
 	}
 	demo.Construct(960, 540, 2, 2);
 	demo.Start();
