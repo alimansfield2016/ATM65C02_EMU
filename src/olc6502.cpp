@@ -255,6 +255,7 @@ uint8_t olc6502::nmi()
 	pc = (hi << 8) | lo;
 
 	cycles = 8;
+	return 0;
 }
 
 // Perform one clock cycles worth of emulation
@@ -1707,15 +1708,19 @@ uint8_t olc6502::SMB7(){
 }
 
 uint8_t olc6502::TSB(){
+	fetch();
+	temp = fetched & a;
+	SetFlag(Z, temp==0);
 	fetched |= a;
 	write(addr_abs, fetched);
-	SetFlag(Z, fetched==0);
 	return 0;
 }
 uint8_t olc6502::TRB(){
-	fetched &= ~a;
+	fetch();
+	temp = fetched & a;
+	SetFlag(Z, temp == 0);
+	fetched &=  ~a;
 	write(addr_abs, fetched);
-	SetFlag(Z, fetched==0);
 	return 0;
 }
 
@@ -1764,6 +1769,7 @@ uint8_t olc6502::STP(){
 }
 uint8_t olc6502::WAI(){
 	wait = true;
+	return 0;
 }
 
 
